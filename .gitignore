@@ -1,0 +1,10 @@
+.env*
+reports/
+*.log
+__pycache__/
+build/
+dist/
+*.spec
+node_modules/
+*.zip
+*.exe

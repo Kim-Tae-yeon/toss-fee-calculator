@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>내 거래 수수료</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<main>
+  <header><span class="mark">₩</span><span>내 거래 수수료 <small>로컬 분석기</small></span><span class="local">내 PC에서 계산</span></header>
+  <section class="intro"><p class="eyebrow">TOSS SECURITIES · FEE REPORT</p><h1>거래하며 쓴 수수료,<br>한눈에 확인하세요.</h1><p>거래에 기록된 실제 수수료를 모아 원화와 달러로 나눠 보여드려요.</p></section>
+  <details class="panel" id="connect" open><summary>Open API로 다시 조회하기</summary>
+    <h2>토스증권 Open API 연결</h2>
+    <p>토스 PC 로그인과 Open API 인증은 별개예요. 보유한 API 키를 아래에 입력하세요.</p>
+    <form id="form" autocomplete="off">
+      <div class="inputs"><label>Client ID<input id="clientId" type="password" placeholder="Client ID" autocomplete="off"></label><label>Client Secret<input id="clientSecret" type="password" placeholder="Client Secret" autocomplete="off"></label></div>
+      <p class="hint">키는 이 PC의 실행 중인 프로그램에서 토스 인증에만 사용하고 파일에 저장하지 않아요. 환경변수로 설정했다면 비워두세요. 토큰 발급 시 같은 키의 기존 토큰은 무효화될 수 있어요.</p>
+      <button id="submit" type="submit">조회 가능한 전체 기간 분석하기 <span>→</span></button>
+    </form>
+    <p class="links"><a href="https://developers.tossinvest.com/docs" target="_blank" rel="noreferrer">공식 API 안내 ↗</a></p>
+  </details>
+  <div id="status" role="status" aria-live="polite">API 연결을 기다리고 있어요.</div>
+
+  <section id="results" hidden>
+    <div class="section-title"><div><p class="eyebrow">ANALYSIS</p><h2>조회된 거래의 수수료 합계</h2></div><a class="export" href="/api/export.csv" download="toss-fees.csv">거래별 CSV 저장 ↓</a></div>
+    <p id="period" class="hint"></p><p id="source-limitation" class="notice"></p><div id="cards" class="cards"></div>
+    <p class="notice" id="missing" hidden></p>
+    <div class="panel"><h2>월별 수수료</h2><p class="hint">각 주문의 최종 체결월 기준이에요. 월을 넘겨 부분 체결된 주문은 최종 체결월에 합산돼요.</p><div class="table-scroll"><table><thead><tr><th>체결월</th><th>통화</th><th>체결 주문</th><th>수수료</th><th>세금</th></tr></thead><tbody id="months"></tbody></table></div></div>
+    <div class="panel"><h2>거래별 내역</h2><p class="hint">최근 300건을 표시해요. CSV에는 분석한 체결 주문 전체가 포함돼요.</p><div class="table-scroll"><table><thead><tr><th>최종 체결일</th><th>계좌</th><th>종목</th><th>구분</th><th>통화</th><th>수수료</th><th>세금</th></tr></thead><tbody id="rows"></tbody></table></div></div>
+  </section>
+  <aside class="notice"><strong>합계에 포함되는 범위</strong><p>Open API가 반환하는 국내·미국 주식 주문의 매매 수수료예요. 세금은 따로 표시하고, 달러를 현재 환율로 원화에 섞지 않아요.</p><p>장전·장후 시간외 종가 등 미지원 주문, 해지·휴면 계좌, 환전 수수료 및 별도 입출금 비용은 포함되지 않아요. <b>계좌 개설 이후 전체 비용은 거래내역서와 대조해야 확정할 수 있어요.</b></p></aside>
+  <footer>거래 화면 가져오기 / 공식 Open API 1.2.19 · 매매 기능 없음 · 내 PC에 저장</footer>
+</main>
+</body></html>
