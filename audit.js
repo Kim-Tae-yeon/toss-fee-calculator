@@ -1,9 +1,25 @@
-import {SCALE,format,summarize} from './engine.js';
+import {SCALE,format,summarize} from './engine.js?v=1.2.0';
 
 export const netFees = r => (r.fee??0n)+(r.fx??0n)+(r.other??0n)-(r.refund??0n);
 const fields=['fee','fx','other','refund'];
 const missingFees=r=>fields.some(k=>r[k+'Expected'] && r[k]==null);
 const hasFees=r=>fields.some(k=>r[k]!=null);
+// Percentages describe the supplied sample, never an unknown lifetime error bound.
+export function percentage(numerator,denominator){
+  const n=BigInt(numerator),d=BigInt(denominator);
+  if(d<=0n)return null;
+  const value=(n<0n?-n:n)*10000n/d;
+  if(n!==0n&&value===0n)return '<0.01%';
+  return `${value/100n}.${String(value%100n).padStart(2,'0')}%`;
+}
+export function evidenceCoverage(report,conversion=convert(report)){
+  const total=report.rows.length;
+  const feeRows=report.rows.filter(r=>hasFees(r)&&!missingFees(r)).length;
+  const convertedRows=conversion.rows.filter(r=>r.converted!==null&&!r.reason).length;
+  const reasons=new Map();
+  for(const issue of conversion.issues)reasons.set(issue.reason,(reasons.get(issue.reason)||0)+1);
+  return {total,feeRows,convertedRows,feePercent:percentage(feeRows,total),conversionPercent:percentage(convertedRows,total),reasons:[...reasons].map(([reason,count])=>({reason,count})),errorBound:null};
+}
 const day=s=>{
   const text=String(s||'');
   const match=/^(\d{4})-(\d{2})-(\d{2})/.exec(text);
@@ -36,7 +52,7 @@ export function convert(report){
       if(!day(r.rateDate)||!r.evidence?.trim())reason='환율 기준일시 또는 출처 없음';
       else if(![day(r.date),day(r.settlement)].filter(Boolean).includes(day(r.rateDate)))reason='거래일·결제일과 환율 기준일이 다름';
       else if(!reason){value=fee*r.rate;method='참고 환율 환산 (실제 원화 지출 아님)';reference+=value;referenceRows++;}
-    }else reason ||= '원화 부과액 또는 해당 거래의 환율 근거 없음';
+    }else reason ||= r.referenceIssue||'원화 부과액 또는 해당 거래의 환율 근거 없음';
     if(reason)issues.push({account:r.account,id:r.id,date:r.date,currency:r.currency,fee,reason});
     if(r.currency==='USD'&&value===null)unconvertedUSD+=fee;
     rows.push({...r,converted:value,method,reason});
@@ -72,7 +88,17 @@ export function reconcile(primary,comparison){
   }
   const daily=[...groups.values()].sort((x,y)=>(x.account+x.currency+x.date).localeCompare(y.account+y.currency+y.date));
   for(const g of daily)g.difference=g.primary-g.comparison;
-  return {matched,conflicts,primaryOnly,comparisonOnly,unidentified,undated,details,daily,
+  const amounts=[];
+  for(const currency of new Set([...a.rows,...b.rows].map(r=>r.currency))){
+    const ar=a.rows.filter(r=>r.currency===currency),br=b.rows.filter(r=>r.currency===currency);
+    const primary=ar.reduce((s,r)=>s+netFees(r),0n),comparison=br.reduce((s,r)=>s+netFees(r),0n);
+    const missing=[...ar,...br].some(r=>!hasFees(r)||missingFees(r));
+    const denominator=comparison<0n?-comparison:comparison;
+    amounts.push({currency,primary,comparison,difference:primary-comparison,missing,
+      percent:!missing&&ar.length&&br.length?percentage(primary-comparison,denominator):null,
+      reason:missing?'수수료 빈 값이 있어 차이율을 확정할 수 없음':!ar.length||!br.length?'한쪽 자료에 해당 통화가 없음':denominator===0n?'대조 합계가 0이어서 비율 계산 불가':''});
+  }
+  return {matched,conflicts,primaryOnly,comparisonOnly,unidentified,undated,details,daily,amounts,
     primaryMissing:a.missing,comparisonMissing:b.missing,
     mismatchDays:daily.filter(g=>g.difference!==0n||!g.primaryCount||!g.comparisonCount||g.missing).length};
 }

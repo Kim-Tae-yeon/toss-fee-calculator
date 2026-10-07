@@ -132,7 +132,7 @@ export function fromJSON(payload) {
   const data=Array.isArray(payload)?payload:payload?.rows;
   if (!Array.isArray(data)||!data.length) throw Error('거래 배열 또는 분석 도구에서 저장한 JSON이 필요합니다.');
   const rows = data.map((o,i)=>({currency:currency(o.currency),fee:money(o.commission),fx:money(o.fxCommission),tax:money(o.tax),date:o.filledAt||o.date||'',symbol:o.symbol||'',kind:o.side||o.kind||'',id:o.orderId||o.id||'',account:o.account||'',line:i+1,feeExpected:Object.hasOwn(o,'commission'),fxExpected:Object.hasOwn(o,'fxCommission'),
-    other:money(o.otherFee),refund:money(o.refund),interest:money(o.interest),otherExpected:Object.hasOwn(o,'otherFee'),refundExpected:Object.hasOwn(o,'refund'),paidKrw:money(o.paidKrw),rate:money(o.referenceRate??o.rate),rateDate:o.rateDate||'',evidence:o.evidence||'',settlement:o.settlementDate||''}));
+    other:money(o.otherFee),refund:money(o.refund),interest:money(o.interest),otherExpected:Object.hasOwn(o,'otherFee'),refundExpected:Object.hasOwn(o,'refund'),paidKrw:money(o.paidKrw),rate:money(o.referenceRate??o.rate),rateDate:o.rateDate||'',evidence:o.evidence||'',settlement:o.settlementDate||'',referenceIssue:o.referenceIssue||''}));
   for (const [i,o] of (payload?.fx?.rows||[]).entries()) rows.push({currency:'KRW',fee:null,fx:money(o.commission),tax:null,date:o.date||'',symbol:'환전',kind:o.kind||'',id:`FX_REPORT|${o.date}|${o.index??i}`,account:'',line:i+1,feeExpected:false,fxExpected:true});
   return rows;
 }

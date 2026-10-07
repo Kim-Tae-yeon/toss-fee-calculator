@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {money,format,parseCSV,guessColumns,fromCSV,fromJSON,summarize,exportCSV} from '../engine.js';
-import {netFees,convert,formatProduct,reconcile} from '../audit.js';
+import {netFees,convert,formatProduct,reconcile,percentage,evidenceCoverage} from '../audit.js';
 const csv=s=>{const p=parseCSV(s);return fromCSV(p,guessColumns(p.headers));};
 const base={currency:'USD',commission:'0.1',date:'2025-01-02',orderId:'x',account:'A'};
 const report=rows=>summarize(fromJSON(rows));
@@ -54,4 +54,31 @@ test('export retains identity and conversion evidence for re-import',()=>{
  const a=report([{...base,referenceRate:'1300',rateDate:base.date,evidence:'source'}]);
  const b=summarize(csv(exportCSV(a)));
  assert.equal(convert(b).complete,true);assert.equal(b.missing,0);assert.equal(b.rows[0].id,'x');assert.equal(b.rows[0].account,'A');assert.equal(b.rows[0].rate,money('1300'));assert.equal(b.rows[0].evidence,'source');
+});
+
+test('coverage counts complete rows, not fields or monetary accuracy',()=>{
+ const r=report([{...base,commission:null},{...base,orderId:'y',commission:'0'},{...base,orderId:'z'}]);
+ const c=evidenceCoverage(r);
+ assert.equal(c.feeRows,2);assert.equal(c.convertedRows,1);
+ assert.equal(c.feePercent,'66.66%');assert.equal(c.conversionPercent,'33.33%');assert.equal(c.errorBound,null);
+ assert.equal(percentage(999999,1000000),'99.99%');assert.equal(percentage(1,1000000),'<0.01%');assert.equal(percentage(0,0),null);
+});
+
+test('comparison difference percentage uses comparison denominator and supports refunds',()=>{
+ const a=fromJSON([{...base,commission:'90'}]),b=fromJSON([{...base,commission:'100'}]);
+ assert.equal(reconcile(a,b).amounts[0].percent,'10.00%');
+ assert.equal(reconcile(fromJSON([{...base,commission:'-90'}]),fromJSON([{...base,commission:'-100'}])).amounts[0].percent,'10.00%');
+ assert.equal(reconcile(a,fromJSON([{...base,commission:'0'}])).amounts[0].percent,null);
+ assert.equal(reconcile(a,fromJSON([{...base,commission:null},{...base,orderId:'zero',commission:'0'}])).amounts[0].percent,null);
+});
+
+test('matching aggregate totals never erase conflicting transactions',()=>{
+ const a=fromJSON([{...base,commission:'1'},{...base,orderId:'y',commission:'3'}]);
+ const b=fromJSON([{...base,commission:'2'},{...base,orderId:'y',commission:'2'}]);
+ const r=reconcile(a,b);assert.equal(r.amounts[0].percent,'0.00%');assert.equal(r.conflicts,2);
+});
+
+test('specific historical lookup issue survives JSON analysis',()=>{
+ const r=convert(report([{...base,referenceIssue:'해당 시각의 환율 API 요청 실패'}]));
+ assert.equal(r.issues[0].reason,'해당 시각의 환율 API 요청 실패');
 });

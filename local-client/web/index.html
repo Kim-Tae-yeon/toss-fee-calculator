@@ -1,30 +1,14 @@
-<!doctype html>
-<html lang="ko">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>내 거래 수수료</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
-<body>
-<main>
-  <header><span class="mark">₩</span><span>내 거래 수수료 <small>로컬 분석기</small></span><span class="local">내 PC에서 계산</span></header>
-  <section class="intro"><p class="eyebrow">TOSS SECURITIES · FEE REPORT</p><h1>거래하며 쓴 수수료,<br>한눈에 확인하세요.</h1><p>거래에 기록된 실제 수수료를 모아 원화와 달러로 나눠 보여드려요.</p></section>
-  <details class="panel" id="connect" open><summary>Open API로 다시 조회하기</summary>
-    <h2>토스증권 Open API 연결</h2>
-    <p>토스 PC 로그인과 Open API 인증은 별개예요. 보유한 API 키를 아래에 입력하세요.</p>
-    <form id="form" autocomplete="off">
-      <div class="inputs"><label>Client ID<input id="clientId" type="password" placeholder="Client ID" autocomplete="off"></label><label>Client Secret<input id="clientSecret" type="password" placeholder="Client Secret" autocomplete="off"></label></div>
-      <p class="hint">키는 이 PC의 실행 중인 프로그램에서 토스 인증에만 사용하고 파일에 저장하지 않아요. 환경변수로 설정했다면 비워두세요. 토큰 발급 시 같은 키의 기존 토큰은 무효화될 수 있어요.</p>
-      <label><input type="checkbox" id="reference-rates"> 거래 당시 참고 환율도 조회 (실제 원화 지출과 구분 · 수 분 소요)</label><button id="submit" type="submit">API 빠른 조회 <span>→</span></button>
-    </form>
-    <p class="links"><a href="https://developers.tossinvest.com/docs" target="_blank" rel="noreferrer">공식 API 안내 ↗</a></p>
-  </details>
-  <div id="status" role="status" aria-live="polite">API 연결을 기다리고 있어요.</div>
-
-  <section id="results" hidden>
-    <div class="section-title"><div><p class="eyebrow">ANALYSIS</p><h2>조회된 거래의 수수료 합계</h2></div><a class="export" href="/api/export.csv" download="toss-fees.csv">거래별 CSV 저장 ↓</a></div>
-    <p><a class="export" href="/audit/" target="_blank" rel="noreferrer">내역서 정밀 검증·원화 환산 열기 ↗</a> · <a href="/api/report" download="toss-fees.json">환율 근거 포함 JSON 저장</a></p><p id="reference-conversion" class="notice" hidden></p><p id="period" class="hint"></p><p id="source-limitation" class="notice"></p><div id="cards" class="cards"></div>
-    <p class="notice" id="missing" hidden></p>
-    <div class="panel"><h2>월별 수수료</h2><p class="hint">각 주문의 최종 체결월 기준이에요. 월을 넘겨 부분 체결된 주문은 최종 체결월에 합산돼요.</p><div class="table-scroll"><table><thead><tr><th>체결월</th><th>통화</th><th>체결 주문</th><th>수수료</th><th>세금</th></tr></thead><tbody id="months"></tbody></table></div></div>
-    <div class="panel"><h2>거래별 내역</h2><p class="hint">최근 300건을 표시해요. CSV에는 분석한 체결 주문 전체가 포함돼요.</p><div class="table-scroll"><table><thead><tr><th>최종 체결일</th><th>계좌</th><th>종목</th><th>구분</th><th>통화</th><th>수수료</th><th>세금</th></tr></thead><tbody id="rows"></tbody></table></div></div>
-  </section>
-  <aside class="notice"><strong>합계에 포함되는 범위</strong><p>Open API가 반환하는 국내·미국 주식 주문의 매매 수수료예요. 세금은 따로 표시하고, 달러를 현재 환율로 원화에 섞지 않아요.</p><p>장전·장후 시간외 종가 등 미지원 주문, 해지·휴면 계좌, 환전 수수료 및 별도 입출금 비용은 포함되지 않아요. <b>계좌 개설 이후 전체 비용은 거래내역서와 대조해야 확정할 수 있어요.</b></p></aside>
-  <footer>거래 화면 가져오기 / 공식 Open API 1.2.19 · 매매 기능 없음 · 내 PC에 저장</footer>
-</main>
-</body></html>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>내 수수료 계산기 · PC 조회</title><link rel="stylesheet" href="/style.css?v=1.2.0"><script src="/app.js?v=1.2.0" defer></script></head><body><main>
+<header><a href="/" class="brand"><span aria-hidden="true">₩</span> 내 수수료 계산기</a><span class="badge">내 PC에서 조회</span></header>
+<section class="hero"><p class="eyebrow">01 · API 빠른 조회</p><h1>거래하며 낸 수수료,<br>먼저 모아볼까요?</h1><p class="lead">API가 제공하는 주문을 모두 조회해 원화와 달러로 나눠 보여드려요.</p></section>
+<details class="panel connect-panel" id="connect" open><summary>토스증권 Open API 연결</summary><p>본인의 Client ID와 Client Secret을 입력하세요. 토스 PC 로그인과 별도의 인증이에요.</p>
+<form id="form" autocomplete="off"><div class="inputs"><label>Client ID<input id="clientId" type="password" placeholder="발급받은 Client ID" autocomplete="off" spellcheck="false" autocapitalize="off" aria-describedby="key-help"></label><label>Client Secret<input id="clientSecret" type="password" placeholder="발급받은 Client Secret" autocomplete="off" spellcheck="false" autocapitalize="off" aria-describedby="key-help"></label></div><p class="hint" id="key-help">키는 토스 인증에만 사용하고 파일에 저장하지 않아요. 환경변수로 설정했다면 비워두세요. 같은 키로 재인증하면 기존 토큰이 무효화될 수 있어요.</p>
+<label class="check-option"><input type="checkbox" id="reference-rates"><span>과거 참고 환율도 함께 조회<small>시간이 더 걸릴 수 있어요. 환산액은 실제 원화 지출과 구분해 표시해요.</small></span></label><div class="actions"><button id="submit" type="submit">API 빠른 조회 시작 →</button><a href="https://developers.tossinvest.com/docs" target="_blank" rel="noreferrer">API 발급·허용 IP 안내 ↗</a></div></form></details>
+<div id="status" role="status" aria-live="polite">API 연결을 기다리고 있어요.</div>
+<section id="results" hidden tabindex="-1"><div class="result-heading"><div><p class="eyebrow">조회 결과</p><h2>확인된 매매 수수료</h2></div><a class="secondary primary" href="/api/export.csv" download="toss-fees.csv">CSV 저장 ↓</a></div><p id="period" class="hint"></p><div id="cards" class="cards"></div><p class="notice" id="missing" hidden></p>
+<div class="panel"><h2>어디까지 확인됐나요?</h2><div id="quality"></div><p id="reference-conversion" class="notice" hidden></p><details><summary>API 조회 범위와 확인하지 못한 항목</summary><p id="source-limitation"></p><p class="hint">조회되지 않은 주문·비용의 금액을 알 수 없어 전체 비용의 오차 상한은 계산할 수 없어요. 결제일이 비어 있다는 이유만으로 미결제라고 판단하지 않아요.</p></details></div>
+<div class="panel next-step"><p class="step-label">02 · 정밀 검증</p><h2>내역서와 대조해 더 확인하세요</h2><p>원화 환산 근거와 미확인 사유를 확인하고, 다른 자료와의 금액 차이율을 볼 수 있어요.</p><div class="actions"><a class="primary" href="/audit/" target="_blank" rel="noreferrer">내역서 정밀 검증 열기 ↗</a><a class="secondary primary" href="/api/report" download="toss-fees.json">근거 포함 JSON 저장 ↓</a></div></div>
+<details class="panel"><summary>월별 수수료 보기</summary><p class="hint">각 주문의 최종 체결월 기준이에요. 월을 넘겨 부분 체결된 주문은 최종 체결월에 합산돼요.</p><div class="table-scroll" tabindex="0" role="region" aria-label="월별 수수료"><table><thead><tr><th>체결월</th><th>통화</th><th>체결 주문</th><th>수수료</th><th>세금 별도</th></tr></thead><tbody id="months"></tbody></table></div></details>
+<details class="panel"><summary>거래별 내역 보기</summary><p class="hint">최근 300건을 표시해요. CSV에는 분석한 체결 주문 전체가 포함돼요.</p><div class="table-scroll" tabindex="0" role="region" aria-label="거래별 수수료"><table><thead><tr><th>최종 체결일</th><th>계좌</th><th>종목</th><th>구분</th><th>통화</th><th>수수료</th><th>세금 별도</th></tr></thead><tbody id="rows"></tbody></table></div></details></section>
+<aside class="notice"><strong>API 연결로 모든 비용이 확인되지는 않아요</strong><p>API 미지원 주문, 환전·입출금 비용과 환급은 거래내역서 확인이 필요해요. 세금은 별도로 표시하며 달러를 현재 환율로 원화에 섞지 않아요.</p></aside><footer>개인 제작 도구 · 토스증권 공식 서비스가 아닙니다.<br>조회 전용 · 매매 기능 없음 · API 문서 1.2.21 기준 확인</footer>
+</main></body></html>

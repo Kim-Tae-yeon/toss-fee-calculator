@@ -49,4 +49,24 @@ class RateTests(unittest.TestCase):
         self.assertEqual(calls[0]['query']['dateTime'],'2025-01-02T12:00:30+09:00')
         self.assertEqual(r['referenceConversion']['usdFeesKrw'],'65.0125')
 
+    def test_failure_reasons_distinguish_data_request_and_validation(self):
+        missing=report();missing['rows'][0]['commission']=None
+        add_reference_rates(missing,response)
+        self.assertIn('수수료 금액이 비어',missing['rows'][0]['referenceIssue'])
+        bad_time=report();bad_time['rows'][0]['filledAt']='invalid'
+        add_reference_rates(bad_time,response)
+        self.assertIn('체결시각',bad_time['rows'][0]['referenceIssue'])
+        invalid=add_reference_rates(report(),lambda *a,**k:{**response(),'rate':'NaN'})
+        self.assertIn('검증 실패',invalid['rows'][0]['referenceIssue'])
+        unavailable=report()
+        unavailable['rows']=[{**unavailable['rows'][0],'orderId':str(i)} for i in range(5)]
+        calls=[]
+        def fail(*a,**k):
+            calls.append(k)
+            raise ValueError('unavailable')
+        add_reference_rates(unavailable,fail)
+        self.assertEqual(len(calls),3)
+        self.assertIn('요청 실패',unavailable['rows'][0]['referenceIssue'])
+        self.assertIn('3회 연속 실패',unavailable['rows'][4]['referenceIssue'])
+
 if __name__=='__main__':unittest.main()

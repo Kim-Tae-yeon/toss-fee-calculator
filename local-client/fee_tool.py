@@ -213,7 +213,7 @@ class TossClient:
         accounts = self._request("/api/v1/accounts")
         if not isinstance(accounts, list):
             raise DataError("계좌 목록 형식이 올바르지 않습니다.")
-        result = []
+        result, retrieval = [], []
         account_ids = set()
         for index, account in enumerate(accounts, 1):
             account_seq = account.get("accountSeq")
@@ -224,12 +224,15 @@ class TossClient:
             for status in ("CLOSED", "OPEN"):
                 query = {"status": status, "limit": 100}
                 cursors = set()
+                pages, orders_returned = 0, 0
                 while True:
                     page = self._request("/api/v1/orders", account=account_seq, query=query)
                     if (not isinstance(page, dict) or not isinstance(page.get("orders"), list)
                             or type(page.get("hasNext")) is not bool or "nextCursor" not in page):
                         raise DataError("페이지 응답이 불완전합니다. 합계를 확정하지 않았습니다.")
                     item["orders"].extend(page["orders"])
+                    pages += 1
+                    orders_returned += len(page["orders"])
                     progress(f"계좌 {index}/{len(accounts)} · 주문 {len(item['orders']):,}건 조회 중")
                     if not page["hasNext"]:
                         if page["nextCursor"] is not None:
@@ -240,8 +243,14 @@ class TossClient:
                         raise DataError("페이지 커서가 없거나 반복됩니다. 전체 조회에 실패했습니다.")
                     cursors.add(cursor)
                     query["cursor"] = cursor
+                retrieval.append({"account": item["label"], "status": status,
+                                  "pages": pages, "ordersReturned": orders_returned,
+                                  "lastPageReached": True})
             result.append(item)
         report = analyze(result)
+        report["retrieval"] = {"dateFilter": None, "allReturnedAccountsProcessed": True,
+                               "groups": retrieval, "referenceRatesRequested": include_rates,
+                               "scope": "API가 반환한 계좌의 CLOSED·OPEN 전체 페이지. API 밖 거래·비용의 완전성은 미확인."}
         if include_rates:
             from reference_rates import add_reference_rates
             add_reference_rates(report, self._request, progress)

@@ -19,19 +19,25 @@ def _add(report, request, progress):
         fee, stamp = row.get('commission'), row.get('filledAt')
         if fee is None:
             missing.append(row['orderId'])
+            row['referenceIssue'] = '원본 주문의 수수료 금액이 비어 있어 환산 불가'
+            errors.append({'orderId': row['orderId'], 'reason': row['referenceIssue']})
             continue
         if Decimal(fee) == 0:
             row['referenceKrw'] = '0'
             continue
         try:
+            failure_reason = '과거 환율 조회가 3회 연속 실패하여 추가 요청을 중단함'
             if consecutive_failures >= 3:
                 raise ValueError('Repeated rate lookup failures; no further requests')
+            failure_reason = '최종 체결시각이 없거나 시간대 형식이 올바르지 않음'
             when = datetime.fromisoformat(stamp.replace('Z', '+00:00'))
             if when.tzinfo is None:
                 raise ValueError('timezone required')
             if stamp not in cache:
+                failure_reason = '해당 시각의 환율 API 요청 실패: 자료 부재·접근 제한·연결 오류 여부 확인 필요'
                 data = request('/api/v1/exchange-rate', query={
                     'baseCurrency': 'USD', 'quoteCurrency': 'KRW', 'dateTime': stamp})
+                failure_reason = '환율 응답의 통화·유효 시간·숫자 형식 검증 실패'
                 if not isinstance(data['rate'], str):
                     raise ValueError('exact decimal rate string required')
                 rate = Decimal(data['rate'])
@@ -51,7 +57,8 @@ def _add(report, request, progress):
         except (ValueError, TypeError, KeyError, ArithmeticError):
             consecutive_failures += 1
             missing.append(row['orderId'])
-            errors.append({'orderId': row['orderId'], 'reason': '과거 환율을 확인하지 못함: 대체 환율 미적용'})
+            row['referenceIssue'] = failure_reason + ' · 대체 환율 미적용'
+            errors.append({'orderId': row['orderId'], 'reason': row['referenceIssue']})
         progress(f'과거 참고 환율 {index}/{len(usd_rows)}건 확인 중 (실제 원화 지출과 구분)')
     krw = report.get('totals', {}).get('KRW', {}).get('commission')
     total = converted + Decimal(krw or '0')
