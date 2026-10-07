@@ -11,7 +11,7 @@
     <form id="form" autocomplete="off">
       <div class="inputs"><label>Client ID<input id="clientId" type="password" placeholder="Client ID" autocomplete="off"></label><label>Client Secret<input id="clientSecret" type="password" placeholder="Client Secret" autocomplete="off"></label></div>
       <p class="hint">키는 이 PC의 실행 중인 프로그램에서 토스 인증에만 사용하고 파일에 저장하지 않아요. 환경변수로 설정했다면 비워두세요. 토큰 발급 시 같은 키의 기존 토큰은 무효화될 수 있어요.</p>
-      <button id="submit" type="submit">조회 가능한 전체 기간 분석하기 <span>→</span></button>
+      <label><input type="checkbox" id="reference-rates"> 거래 당시 참고 환율도 조회 (실제 원화 지출과 구분 · 수 분 소요)</label><button id="submit" type="submit">API 빠른 조회 <span>→</span></button>
     </form>
     <p class="links"><a href="https://developers.tossinvest.com/docs" target="_blank" rel="noreferrer">공식 API 안내 ↗</a></p>
   </details>
@@ -19,7 +19,7 @@
 
   <section id="results" hidden>
     <div class="section-title"><div><p class="eyebrow">ANALYSIS</p><h2>조회된 거래의 수수료 합계</h2></div><a class="export" href="/api/export.csv" download="toss-fees.csv">거래별 CSV 저장 ↓</a></div>
-    <p id="period" class="hint"></p><p id="source-limitation" class="notice"></p><div id="cards" class="cards"></div>
+    <p><a class="export" href="/audit/" target="_blank" rel="noreferrer">내역서 정밀 검증·원화 환산 열기 ↗</a> · <a href="/api/report" download="toss-fees.json">환율 근거 포함 JSON 저장</a></p><p id="reference-conversion" class="notice" hidden></p><p id="period" class="hint"></p><p id="source-limitation" class="notice"></p><div id="cards" class="cards"></div>
     <p class="notice" id="missing" hidden></p>
     <div class="panel"><h2>월별 수수료</h2><p class="hint">각 주문의 최종 체결월 기준이에요. 월을 넘겨 부분 체결된 주문은 최종 체결월에 합산돼요.</p><div class="table-scroll"><table><thead><tr><th>체결월</th><th>통화</th><th>체결 주문</th><th>수수료</th><th>세금</th></tr></thead><tbody id="months"></tbody></table></div></div>
     <div class="panel"><h2>거래별 내역</h2><p class="hint">최근 300건을 표시해요. CSV에는 분석한 체결 주문 전체가 포함돼요.</p><div class="table-scroll"><table><thead><tr><th>최종 체결일</th><th>계좌</th><th>종목</th><th>구분</th><th>통화</th><th>수수료</th><th>세금</th></tr></thead><tbody id="rows"></tbody></table></div></div>

@@ -20,6 +20,9 @@ function tableRow(target, values) {
 function show(report) {
   $("source-limitation").textContent = report.source + " · " + report.limitation;
   $("results").hidden = false;
+  const conversion=report.referenceConversion;
+  $("reference-conversion").hidden=!conversion;
+  if(conversion)$("reference-conversion").textContent=(conversion.complete?`매매 수수료 참고 원화 환산: ${amount(conversion.roundedKrw)}원`:`과거 환율 누락 ${conversion.missingCount}건 · 전체 환산 미확정`)+` · ${conversion.basis} 환전·기타 수수료는 내역서와 대조해 추가해야 합니다.`;
   $("cards").replaceChildren(); $("months").replaceChildren(); $("rows").replaceChildren();
   $("period").textContent = `${report.firstFill || "체결 없음"} ~ ${report.lastFill || "—"} · 계좌 ${report.accountCount}개 · ${report.observationCount ? '합산 거래' : '체결 주문'} ${report.filledCount.toLocaleString()}건 · 중복 제외 ${report.duplicatesRemoved}건`;
   let missing = 0;
@@ -68,7 +71,7 @@ $("form").addEventListener("submit", async event => {
   event.preventDefault(); if (polling) return;
   $("submit").disabled = true; $("results").hidden = true;
   try {
-    const body = JSON.stringify({clientId:$("clientId").value, clientSecret:$("clientSecret").value});
+    const body = JSON.stringify({clientId:$("clientId").value, clientSecret:$("clientSecret").value,referenceRates:$("reference-rates").checked});
     $("clientId").value = ""; $("clientSecret").value = "";
     const response = await fetch("/api/analyze", {method:"POST", headers:{"Content-Type":"application/json", "X-CSRF-Token":csrf}, body});
     const result = await response.json();

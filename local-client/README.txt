@@ -23,3 +23,7 @@ https://developers.tossinvest.com/docs
 
 브라우저에서 분석: https://kim-tae-yeon.github.io/toss-fee-calculator/
 소스: https://github.com/Kim-Tae-yeon/toss-fee-calculator
+
+버전 1.1: 거래별 과거 참고 환율, 원화 환산 근거, 기타 수수료·환급, 원본 대조 지원.
+조회 화면의 과거 환율 옵션은 수 분 걸릴 수 있습니다. 실제 원화 출금액이 아닌 참고 환산이며, 환율 누락 시 현재 환율로 대체하지 않습니다.
+결과의 [원화 환산·내역서 대조 열기]에서 기준 파일과 대조 파일을 비교하세요. 두 파일은 더하지 않습니다.

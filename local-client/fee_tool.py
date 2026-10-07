@@ -155,7 +155,7 @@ class TossClient:
 
     def _request(self, path, *, account=None, query=None, form=None):
         # No order placement/modification/cancellation endpoint is implemented.
-        if path not in ("/oauth2/token", "/api/v1/accounts", "/api/v1/orders"):
+        if path not in ("/oauth2/token", "/api/v1/accounts", "/api/v1/orders", "/api/v1/exchange-rate"):
             raise DataError("허용되지 않은 API 경로입니다.")
         if (form is not None) != (path == "/oauth2/token"):
             raise DataError("허용되지 않은 API 요청 방식입니다.")
@@ -202,7 +202,7 @@ class TossClient:
             except (json.JSONDecodeError, UnicodeError):
                 raise DataError("토스 API가 올바른 JSON을 반환하지 않았습니다.") from None
 
-    def collect(self, progress=lambda value: None):
+    def collect(self, progress=lambda value: None, *, include_rates=False):
         auth = self._request("/oauth2/token", form={
             "grant_type": "client_credentials", "client_id": self.client_id,
             "client_secret": self.client_secret,
@@ -241,7 +241,11 @@ class TossClient:
                     cursors.add(cursor)
                     query["cursor"] = cursor
             result.append(item)
-        return analyze(result)
+        report = analyze(result)
+        if include_rates:
+            from reference_rates import add_reference_rates
+            add_reference_rates(report, self._request, progress)
+        return report
 
 
 def csv_report(report):
@@ -311,6 +315,12 @@ class Handler(BaseHTTPRequestHandler):
         static = {"/": ("index.html", "text/html; charset=utf-8"),
                   "/app.js": ("app.js", "text/javascript; charset=utf-8"),
                   "/style.css": ("style.css", "text/css; charset=utf-8")}
+        if path.startswith('/audit/'):
+            name = path[len('/audit/'):] or 'index.html'
+            allowed = {'index.html':'text/html', 'app.js':'text/javascript', 'engine.js':'text/javascript', 'audit.js':'text/javascript', 'audit-ui.js':'text/javascript', 'bridge.js':'text/javascript', 'style.css':'text/css'}
+            if name not in allowed:
+                return self.reply(404, {"error":"없는 경로입니다."})
+            return self.reply(200, (ROOT / 'audit' / name).read_bytes(), allowed[name]+'; charset=utf-8')
         if path in static:
             name, content_type = static[path]
             return self.reply(200, (ROOT / "web" / name).read_bytes(), content_type)
@@ -375,7 +385,7 @@ class Handler(BaseHTTPRequestHandler):
                 with self.server.lock:
                     self.server.state = {"status": "running", "message": message}
             try:
-                report = client.collect(progress)
+                report = client.collect(progress, include_rates=payload.get("referenceRates") is True)
                 with self.server.lock:
                     self.server.report = report
                     self.server.state = {"status": "done", "message": "조회 가능한 모든 페이지를 분석했어요."}

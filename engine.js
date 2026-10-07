@@ -49,25 +49,34 @@ export const aliases = {
   currency:['currency','통화','통화코드'], fee:['commission','fee','수수료','매매수수료','거래수수료'],
   fx:['exchangefee','fxfee','fxcommission','환전수수료'], tax:['tax','세금','제세금'],
   date:['filledat','date','거래일','거래일자','체결일','일시'], symbol:['symbol','종목','종목명'],
-  id:['orderid','transactionid','거래번호','주문번호'], account:['account','계좌','계좌번호'], kind:['type','구분','거래유형','side']
+  id:['orderid','transactionid','거래번호','주문번호'], account:['account','계좌','계좌번호'], kind:['type','구분','거래유형','side'],
+  other:['otherfee','기타수수료'],refund:['refund','수수료환급'],interest:['interest','지급이자'],
+  paidKrw:['paidkrw','수수료원화부과액'],rate:['rate','referenceRate'.toLowerCase(),'참고환율'],
+  rateDate:['ratedate','환율기준일시'],evidence:['evidence','근거'],settlement:['settlementdate','결제일']
 };
 export function guessColumns(headers) {
   return Object.fromEntries(Object.entries(aliases).map(([field, names]) => [field, headers.findIndex(h=>names.includes(h.toLowerCase().replace(/[\s_]/g,'')))]));
 }
 export function fromCSV(parsed, mapping, fixedCurrency='') {
-  const numeric = ['fee','fx','tax'].map(k=>mapping[k]).filter(i=>i>=0);
+  const numeric = ['fee','fx','tax','other','refund','interest','paidKrw','rate'].map(k=>mapping[k]).filter(i=>i>=0);
   if (new Set(numeric).size !== numeric.length) throw Error('매매 수수료·환전 수수료·세금에는 서로 다른 열을 선택해주세요.');
-  if (mapping.fee < 0 && mapping.fx < 0) throw Error('수수료 또는 환전 수수료 열을 선택해주세요.');
+  if (!['fee','fx','other','refund'].some(k=>mapping[k]>=0)) throw Error('수수료·환전·기타 수수료·환급 중 하나의 열을 선택해주세요.');
   if (mapping.currency < 0 && !fixedCurrency) throw Error('통화 열 또는 파일의 통화를 선택해주세요.');
   return parsed.rows.map((r,i)=>{
     const get=k=>mapping[k]>=0 ? r[mapping[k]] : '';
+    const scopeIndex=parsed.headers.indexOf('feeScope');
+    const scope=scopeIndex>=0?r[scopeIndex].split('|'):null;
+    if(scope?.some(k=>!['fee','fx','other','refund',''].includes(k)))throw Error('feeScope 형식을 확인하세요.');
+    const expected=k=>scope?scope.includes(k):mapping[k]>=0;
     const c=currency(fixedCurrency || get('currency'));
-    for (const key of ['fee','fx','tax']) {
+    for (const key of ['fee','fx','tax','other','refund','interest']) {
       if ((c==='KRW' && /\$|USD/i.test(get(key))) || (c==='USD' && /원|₩|KRW/i.test(get(key)))) throw Error(`${i+2}행의 통화와 금액 단위가 다릅니다.`);
     }
     const fee=money(get('fee')), fx=money(get('fx'));
     if (fee===null && fx===null && get('tax').trim()==='' && r.every(s=>!s.trim())) return null;
-    return {currency:c,fee,fx,tax:money(get('tax')),date:get('date'),symbol:get('symbol'),kind:get('kind'),id:get('id'),account:get('account'),line:i+2,feeExpected:mapping.fee>=0,fxExpected:mapping.fx>=0};
+    return {currency:c,fee,fx,tax:money(get('tax')),date:get('date'),symbol:get('symbol'),kind:get('kind'),id:get('id'),account:get('account'),line:i+2,feeExpected:expected('fee'),fxExpected:expected('fx'),
+      other:money(get('other')),refund:money(get('refund')),interest:money(get('interest')),otherExpected:expected('other'),refundExpected:expected('refund'),
+      paidKrw:money(get('paidKrw')),rate:money(get('rate')),rateDate:get('rateDate'),evidence:get('evidence'),settlement:get('settlement')};
   }).filter(Boolean);
 }
 function dateText(text) {
@@ -94,7 +103,7 @@ export function detail(text, index=0) {
   const settlement=dateText(get(kind==='주식구매'?'출금일':'입금일'));
   // KR details combine same-day fills. US details are separate ledger transactions.
   const id=c==='KRW'?['KR_DETAIL',symbol,kind,date,settlement].join('|'):'';
-  return {currency:c,fee,fx:null,tax,date,symbol,kind,id,account:'',line:index+1,feeExpected:true,fxExpected:false,net:money(net),gross:money(get(kind==='주식구매'?'총 구매금액':'총 판매금액'))};
+  return {currency:c,fee,fx:null,tax,date,symbol,kind,id,account:'',settlement,line:index+1,feeExpected:true,fxExpected:false,net:money(net),gross:money(get(kind==='주식구매'?'총 구매금액':'총 판매금액'))};
 }
 export function fromText(text) {
   const lines=text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
@@ -106,6 +115,7 @@ export function fromJSON(payload) {
   if (payload && Array.isArray(payload.observations)) {
     const rows=payload.observations.map((o,i)=>{
       const r=detail(o.detail,i);
+      r.account=o.account||payload.account||'';
       if (o.currency!==r.currency) throw Error('수집 자료의 통화가 일치하지 않습니다.');
       if (r.currency==='USD') {
         if (!Number.isInteger(o.index) || !o.row) throw Error('해외 거래 행 번호가 없습니다.');
@@ -115,31 +125,37 @@ export function fromJSON(payload) {
       return r;
     });
     for (const [i,o] of (payload.fxObservations||[]).entries()) {
-      const r=detail(o.detail,i); r.id=Number.isInteger(o.index)?`FX_DETAIL|${r.date}|${o.index}`:'';rows.push(r);
+      const r=detail(o.detail,i); r.account=o.account||payload.account||'';r.id=Number.isInteger(o.index)?`FX_DETAIL|${r.date}|${o.index}`:'';rows.push(r);
     }
     return rows;
   }
   const data=Array.isArray(payload)?payload:payload?.rows;
   if (!Array.isArray(data)||!data.length) throw Error('거래 배열 또는 분석 도구에서 저장한 JSON이 필요합니다.');
-  const rows = data.map((o,i)=>({currency:currency(o.currency),fee:money(o.commission),fx:money(o.fxCommission),tax:money(o.tax),date:o.filledAt||o.date||'',symbol:o.symbol||'',kind:o.side||'',id:o.orderId||o.id||'',account:o.account||'',line:i+1,feeExpected:true,fxExpected:Object.hasOwn(o,'fxCommission')}));
+  const rows = data.map((o,i)=>({currency:currency(o.currency),fee:money(o.commission),fx:money(o.fxCommission),tax:money(o.tax),date:o.filledAt||o.date||'',symbol:o.symbol||'',kind:o.side||o.kind||'',id:o.orderId||o.id||'',account:o.account||'',line:i+1,feeExpected:Object.hasOwn(o,'commission'),fxExpected:Object.hasOwn(o,'fxCommission'),
+    other:money(o.otherFee),refund:money(o.refund),interest:money(o.interest),otherExpected:Object.hasOwn(o,'otherFee'),refundExpected:Object.hasOwn(o,'refund'),paidKrw:money(o.paidKrw),rate:money(o.referenceRate??o.rate),rateDate:o.rateDate||'',evidence:o.evidence||'',settlement:o.settlementDate||''}));
   for (const [i,o] of (payload?.fx?.rows||[]).entries()) rows.push({currency:'KRW',fee:null,fx:money(o.commission),tax:null,date:o.date||'',symbol:'환전',kind:o.kind||'',id:`FX_REPORT|${o.date}|${o.index??i}`,account:'',line:i+1,feeExpected:false,fxExpected:true});
   return rows;
 }
 export function summarize(records) {
   if (!records.length) throw Error('계산할 거래가 없습니다.');
   const totals={}, seen=new Map(), rows=[]; let duplicates=0,missing=0,unknownTax=0,unidentified=0;
-  for (const r of records) {
+  for (const original of records) {
+    const r={other:null,refund:null,interest:null,paidKrw:null,rate:null,rateDate:'',evidence:'',settlement:'',...original};
+    if(r.refund!==null && r.refund<0n) throw Error('수수료환급은 양수로 입력하세요. 음수 수수료와 같은 환급을 중복 입력하지 마세요.');
+    if(r.rate!==null && r.rate<=0n) throw Error('환율은 0보다 커야 합니다.');
     currency(r.currency);
     if (r.id) {
       const key=JSON.stringify([r.account,r.currency,r.id]);
-      const signature=JSON.stringify([r.fee,r.fx,r.tax,r.date,r.symbol,r.kind,r.net,r.gross],(_,v)=>typeof v==='bigint'?v.toString():v);
+      const signature=JSON.stringify([r.fee,r.fx,r.tax,r.date,r.symbol,r.kind,r.net,r.gross,r.other,r.refund,r.interest,r.paidKrw,r.rate,r.rateDate,r.evidence,r.settlement,r.feeExpected,r.fxExpected,r.otherExpected,r.refundExpected],(_,v)=>typeof v==='bigint'?v.toString():v);
       if (seen.has(key)) {if(seen.get(key)!==signature) throw Error('같은 거래번호의 금액 또는 상세 내용이 다릅니다. 중복·정정 내역을 확인해주세요.');duplicates++;continue;}
       seen.set(key,signature);
     } else unidentified++;
-    const t=totals[r.currency] ||= {fee:0n,fx:0n,tax:0n,known:0,count:0};
+    const t=totals[r.currency] ||= {fee:0n,fx:0n,tax:0n,other:0n,refund:0n,interest:0n,known:0,count:0};
     t.count++;
     if(r.fee!==null){t.fee+=r.fee;t.known++;} else if(r.feeExpected)missing++;
     if(r.fx!==null){t.fx+=r.fx;t.known++;} else if(r.fxExpected)missing++;
+    for(const key of ['other','refund']){if(r[key]!==null){t[key]+=r[key];t.known++;}else if(r[key+'Expected'])missing++;}
+    if(r.interest!==null)t.interest+=r.interest;
     if(r.tax!==null)t.tax+=r.tax;else unknownTax++;
     rows.push(r);
   }
@@ -148,7 +164,9 @@ export function summarize(records) {
 }
 export function exportCSV(report) {
   const escape=(s,numeric=false)=>{s=String(s??'');if(!numeric && /^[=+@\-\t\r\n]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
-  const lines=[['date','currency','symbol','commission','fxCommission','tax']];
-  for(const r of report.rows)lines.push([r.date,r.currency,r.symbol,r.fee===null?'':format(r.fee).replace(/,/g,''),r.fx===null?'':format(r.fx).replace(/,/g,''),r.tax===null?'':format(r.tax).replace(/,/g,'')]);
-  return '\uFEFF'+lines.map((r,ri)=>r.map((v,i)=>escape(v,ri>0&&i>=3)).join(',')).join('\r\n');
+  const fields=[['date','date'],['currency','currency'],['symbol','symbol'],['commission','fee'],['fxCommission','fx'],['tax','tax'],['otherFee','other'],['refund','refund'],['interest','interest'],['paidKrw','paidKrw'],['rate','rate'],['rateDate','rateDate'],['evidence','evidence'],['orderId','id'],['account','account'],['side','kind'],['settlementDate','settlement']];
+  const nums=new Set(['fee','fx','tax','other','refund','interest','paidKrw','rate']);
+  const lines=[[...fields.map(([name])=>name),'feeScope']];
+  for(const r of report.rows)lines.push([...fields.map(([,key])=>nums.has(key)?r[key]==null?'':format(r[key]).replace(/,/g,''):r[key]||''),['fee','fx','other','refund'].filter(k=>r[k+'Expected']).join('|')]);
+  return '\uFEFF'+lines.map((r,ri)=>r.map((v,i)=>escape(v,ri>0&&i<fields.length&&nums.has(fields[i][1]))).join(',')).join('\r\n');
 }

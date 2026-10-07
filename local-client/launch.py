@@ -17,6 +17,9 @@ if __name__ == '__main__':
             assert json.load(response)['status'] == 'idle'
         with urlopen(address) as response:
             assert response.status == 200
+        for path in ['/audit/','/audit/app.js','/audit/engine.js','/audit/audit.js','/audit/audit-ui.js','/audit/bridge.js']:
+            with urlopen(address+path) as response:
+                assert response.status == 200
         server.shutdown()
         server.server_close()
         print('Portable client smoke test passed')
